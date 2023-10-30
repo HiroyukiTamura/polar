@@ -9,6 +9,8 @@ dependencies:
   flutter:
     sdk: flutter
 
+  freezed_annotation: ^2.4.1
+  json_annotation: ^4.8.1
   polar:
     path: ../
 
@@ -21,6 +23,9 @@ dev_dependencies:
     sdk: flutter
 
   rexios_lints: ^6.0.1
+  freezed: ^2.4.5
+  json_serializable: ^6.7.1
+  build_runner: ^2.4.6
 
 flutter:
   uses-material-design: true

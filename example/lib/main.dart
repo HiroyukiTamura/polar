@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:polar/polar.dart';
+import 'package:polar_example/model/polar_offline_recording.dart';
+import 'package:polar_example/recording_type.dart';
 import 'package:uuid/uuid.dart';
 
 void main() {
@@ -15,7 +19,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  static const identifier = '1C709B20';
+  static const identifier = 'C61A4F28';
 
   final polar = Polar();
   final logs = ['Service started'];
@@ -80,30 +84,58 @@ class _MyAppState extends State<MyApp> {
   }
 
   void streamWhenReady() async {
-    await polar.sdkFeatureReady.firstWhere(
-      (e) =>
-          e.identifier == identifier &&
-          e.feature == PolarSdkFeature.onlineStreaming,
+    final futureOffline = polar.sdkFeatureReady.firstWhere(
+      (e) => e.identifier == identifier && e.feature == PolarSdkFeature.offlineRecording,
     );
-    final availabletypes =
-        await polar.getAvailableOnlineStreamDataTypes(identifier);
+    final futureOnline = polar.sdkFeatureReady.firstWhere(
+      (e) => e.identifier == identifier && e.feature == PolarSdkFeature.onlineStreaming,
+    );
+    await Future.wait([futureOffline, futureOnline]);
+
+    final availabletypes = await polar.getAvailableOnlineStreamDataTypes(identifier);
 
     debugPrint('available types: $availabletypes');
 
-    if (availabletypes.contains(PolarDataType.hr)) {
-      polar
-          .startHrStreaming(identifier)
-          .listen((e) => log('Heart rate: ${e.samples.map((e) => e.hr)}'));
-    }
-    if (availabletypes.contains(PolarDataType.ecg)) {
-      polar
-          .startEcgStreaming(identifier)
-          .listen((e) => log('ECG data received'));
-    }
-    if (availabletypes.contains(PolarDataType.acc)) {
-      polar
-          .startAccStreaming(identifier)
-          .listen((e) => log('ACC data received'));
+    if (availabletypes.contains(PolarDataType.ppi)) {
+      try {
+        await polar.stopOfflineRecording(identifier, type: RecordingType.ppi.name);
+        await Future.delayed(const Duration(seconds: 3));
+      } catch (e) {
+        print(e);
+      }
+
+      try {
+        final string = await polar.getLastPpiOfflineRecordingData(identifier);
+        final json = jsonDecode(string!);
+        final recordingData = PolarOfflineRecording.fromJson(json);
+        print(recordingData);
+      } catch (e) {
+        print(e);
+      }
+
+      await polar.startOfflineRecording(
+        identifier,
+        type: RecordingType.acc.toString(),
+      );
+      await Future.delayed(const Duration(minutes: 1));
+
+      await polar.stopOfflineRecording(
+        identifier,
+        type: RecordingType.acc.toString(),
+      );
+
+      await Future.delayed(const Duration(seconds: 5));
+
+      try {
+        final string = await polar.getLastPpiOfflineRecordingData(identifier);
+        final json = jsonDecode(string!);
+        final recordingData = PolarOfflineRecording.fromJson(json);
+        print(recordingData);
+      } catch (e) {
+        print(e);
+      }
+
+      debugPrint('good work');
     }
   }
 
