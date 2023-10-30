@@ -2,6 +2,7 @@ package dev.rexios.polar
 
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.lifecycle.Lifecycle.Event
 import androidx.lifecycle.LifecycleEventObserver
 import com.google.gson.GsonBuilder
@@ -21,6 +22,8 @@ import com.polar.sdk.api.PolarH10OfflineExerciseApi.SampleType
 import com.polar.sdk.api.model.PolarDeviceInfo
 import com.polar.sdk.api.model.PolarExerciseEntry
 import com.polar.sdk.api.model.PolarHrData
+import com.polar.sdk.api.model.PolarOfflineRecordingData
+import com.polar.sdk.api.model.PolarOfflineRecordingEntry
 import com.polar.sdk.api.model.PolarSensorSetting
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -33,7 +36,9 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.disposables.Disposable
+import java.lang.IllegalArgumentException
 import java.lang.reflect.Type
 import java.util.Date
 import java.util.UUID
@@ -121,6 +126,9 @@ class PolarPlugin : FlutterPlugin, MethodCallHandler, PolarBleApiCallbackProvide
             "removeExercise" -> removeExercise(call, result)
             "enableLedAnimation" -> enableLedAnimation(call, result)
             "doFactoryReset" -> doFactoryReset(call, result)
+            "startOfflineRecording" -> startOfflineRecording(call, result)
+            "stopOfflineRecording" -> stopOfflineRecording(call, result)
+            "getLastPpiOfflineRecordingData" -> getLastPpiOfflineRecordingData(call, result)
             else -> result.notImplemented()
         }
     }
@@ -322,6 +330,91 @@ class PolarPlugin : FlutterPlugin, MethodCallHandler, PolarBleApiCallbackProvide
                 result.error(it.toString(), it.message, null)
             }
         }).discard()
+    }
+
+    private fun startOfflineRecording(call: MethodCall, result: Result) {
+        val arguments = call.arguments as List<*>
+        val identifier = arguments[0] as String
+
+        api.startOfflineRecording(
+            identifier,
+            PolarDeviceDataType.PPI,
+        )
+            .subscribe(
+                { runOnUiThread { result.success(null) } },
+                { runOnUiThread { result.error(it.toString(), it.message, null) } }
+            ).discard()
+    }
+
+    private fun stopOfflineRecording(call: MethodCall, result: Result) {
+        val arguments = call.arguments as List<*>
+        val identifier = arguments[0] as String
+
+        api.stopOfflineRecording(
+            identifier,
+            PolarDeviceDataType.PPI,
+        )
+            .subscribe(
+                {
+                    runOnUiThread { result.success(null) }
+                },
+                { runOnUiThread { result.error(it.toString(), it.message, null) } }
+            ).discard()
+    }
+
+    private fun getLastPpiOfflineRecordingData(call: MethodCall, result: Result) {
+        val arguments = call.arguments as List<*>
+        val identifier = arguments[0] as String
+
+        val entryList = mutableListOf<PolarOfflineRecordingEntry>()
+
+        api.listOfflineRecordings(identifier)
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe(
+                {
+                    Log.d(
+                        "TAG",
+                        "next: ${it.date} path: ${it.path} size: ${it.size}"
+                    )
+                    entryList.add(it)
+                },
+                {
+                    Log.e("TAG", "Failed to list recordings: $it")
+                    runOnUiThread { result.error(it.toString(), it.message, null) }
+                },
+                {
+                    val entry = entryList.maxByOrNull { it.date }!!
+
+                    api.getOfflineRecord(identifier, entry).subscribe(
+                        {
+                            Log.d(
+                                "TAG",
+                                "Recording ${entry.path} downloaded. Size: ${entry.size}"
+                            )
+                            when (it) {
+                                is PolarOfflineRecordingData.PpiOfflineRecording -> {
+                                    Log.d("TAG", "PPI Recording started at ${it.startTime}")
+                                    for (sample in it.data.samples)
+                                        Log.d(
+                                            "TAG",
+                                            "PPI data: ${sample.ppi}"
+                                        )
+                                }
+                                else -> throw IllegalArgumentException("Recording type is not yet implemented")
+                            }
+                            val map = mapOf(
+                                "type" to "aac",
+                                "data" to it,
+                            )
+                            val json = gson.toJson(map)
+                            runOnUiThread {
+                                result.success(json)
+                            }
+                        },
+                        { throwable: Throwable -> Log.e("TAG", "" + throwable.toString()) }
+                    ).discard()
+                }
+            ).discard()
     }
 
     override fun blePowerStateChanged(powered: Boolean) {

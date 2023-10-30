@@ -16,22 +16,18 @@ class Polar {
 
   // Other data
   final _blePowerState = StreamController<bool>.broadcast();
-  final _sdkFeatureReady =
-      StreamController<PolarSdkFeatureReadyEvent>.broadcast();
+  final _sdkFeatureReady = StreamController<PolarSdkFeatureReadyEvent>.broadcast();
   final _deviceConnected = StreamController<PolarDeviceInfo>.broadcast();
   final _deviceConnecting = StreamController<PolarDeviceInfo>.broadcast();
-  final _deviceDisconnected =
-      StreamController<PolarDeviceDisconnectedEvent>.broadcast();
-  final _disInformation =
-      StreamController<PolarDisInformationEvent>.broadcast();
+  final _deviceDisconnected = StreamController<PolarDeviceDisconnectedEvent>.broadcast();
+  final _disInformation = StreamController<PolarDisInformationEvent>.broadcast();
   final _batteryLevel = StreamController<PolarBatteryLevelEvent>.broadcast();
 
   /// helper to ask ble power state
   Stream<bool> get blePowerState => _blePowerState.stream;
 
   /// feature ready callback
-  Stream<PolarSdkFeatureReadyEvent> get sdkFeatureReady =>
-      _sdkFeatureReady.stream;
+  Stream<PolarSdkFeatureReadyEvent> get sdkFeatureReady => _sdkFeatureReady.stream;
 
   /// Device connection has been established.
   ///
@@ -47,8 +43,7 @@ class Polar {
   /// If PolarBleApi#disconnectFromPolarDevice is not called, a new connection attempt is dispatched automatically.
   ///
   /// - Parameter identifier: Polar device info
-  Stream<PolarDeviceDisconnectedEvent> get deviceDisconnected =>
-      _deviceDisconnected.stream;
+  Stream<PolarDeviceDisconnectedEvent> get deviceDisconnected => _deviceDisconnected.stream;
 
   ///  Received DIS info.
   ///
@@ -93,12 +88,10 @@ class Polar {
         );
         return;
       case 'deviceConnected':
-        _deviceConnected
-            .add(PolarDeviceInfo.fromJson(jsonDecode(call.arguments)));
+        _deviceConnected.add(PolarDeviceInfo.fromJson(jsonDecode(call.arguments)));
         return;
       case 'deviceConnecting':
-        _deviceConnecting
-            .add(PolarDeviceInfo.fromJson(jsonDecode(call.arguments)));
+        _deviceConnecting.add(PolarDeviceInfo.fromJson(jsonDecode(call.arguments)));
         return;
       case 'deviceDisconnected':
         _deviceDisconnected.add(
@@ -265,8 +258,7 @@ class Polar {
   ///   - onNext: for every air packet received. see `PolarHrData`
   ///   - onError: see `PolarErrors` for possible errors invoked
   Stream<PolarHrData> startHrStreaming(String identifier) {
-    return _startStreaming(PolarDataType.hr, identifier)
-        .map(PolarHrData.fromJson);
+    return _startStreaming(PolarDataType.hr, identifier).map(PolarHrData.fromJson);
   }
 
   /// Start the ECG (Electrocardiography) stream. ECG stream is stopped if the connection is closed, error occurs or stream is disposed.
@@ -367,8 +359,7 @@ class Polar {
   ///   - onNext: for every air packet received. see `PolarPpiData`
   ///   - onError: see `PolarErrors` for possible errors invoked
   Stream<PolarPpiData> startPpiStreaming(String identifier) {
-    return _startStreaming(PolarDataType.ppi, identifier)
-        .map(PolarPpiData.fromJson);
+    return _startStreaming(PolarDataType.ppi, identifier).map(PolarPpiData.fromJson);
   }
 
   /// Request start recording. Supported only by Polar H10. Requires `polarFileTransfer` feature.
@@ -412,8 +403,7 @@ class Polar {
   ///   - success: see `PolarRecordingStatus`
   ///   - onError: see `PolarErrors` for possible errors invoked
   Future<PolarRecordingStatus> requestRecordingStatus(String identifier) async {
-    final result =
-        await _channel.invokeListMethod('requestRecordingStatus', identifier);
+    final result = await _channel.invokeListMethod('requestRecordingStatus', identifier);
 
     return PolarRecordingStatus(ongoing: result![0], entryId: result[1]);
   }
@@ -430,10 +420,7 @@ class Polar {
     if (result == null) {
       return [];
     }
-    return result
-        .cast<String>()
-        .map((e) => PolarExerciseEntry.fromJson(jsonDecode(e)))
-        .toList();
+    return result.cast<String>().map((e) => PolarExerciseEntry.fromJson(jsonDecode(e))).toList();
   }
 
   /// Api for fetching a single exercise from Polar H10 device. Requires `polarFileTransfer` feature. This API is working for Polar OH1 and Polar Verity Sense devices too, however in those devices recording of exercise requires that sensor is registered to Polar Flow account.
@@ -448,8 +435,7 @@ class Polar {
     String identifier,
     PolarExerciseEntry entry,
   ) async {
-    final result = await _channel
-        .invokeMethod('fetchExercise', [identifier, jsonEncode(entry)]);
+    final result = await _channel.invokeMethod('fetchExercise', [identifier, jsonEncode(entry)]);
     return PolarExerciseData.fromJson(jsonDecode(result));
   }
 
@@ -462,8 +448,7 @@ class Polar {
   ///   - complete: entry successfully removed
   ///   - onError: see `PolarErrors` for possible errors invoked
   Future<void> removeExercise(String identifier, PolarExerciseEntry entry) {
-    return _channel
-        .invokeMethod('removeExercise', [identifier, jsonEncode(entry)]);
+    return _channel.invokeMethod('removeExercise', [identifier, jsonEncode(entry)]);
   }
 
   /// Enable or disable blinking sensor LEDs (Verity Sense).
@@ -495,4 +480,39 @@ class Polar {
       [identifier, preservePairingInformation],
     );
   }
+
+  Future<void> startOfflineRecording(
+    String identifier, {
+    required String type,
+  }) async =>
+      _channel.invokeMethod(
+        'startOfflineRecording',
+        [identifier, type],
+      );
+
+  Future<void> stopOfflineRecording(
+    String identifier, {
+    required String type,
+  }) async =>
+      _channel.invokeMethod(
+        'stopOfflineRecording',
+        [identifier, type],
+      );
+
+  Future<String?> listOfflineRecordings(String identifier) async =>
+      await _channel.invokeMethod<String>(
+        'listOfflineRecordings',
+        [identifier],
+      );
+
+  Future<void> getLastOfflineRecordingData(String identifier) async => _channel.invokeMethod(
+        'getLastOfflineRecordingData',
+        [identifier],
+      );
+
+  Future<String?> getLastPpiOfflineRecordingData(String identifier) async =>
+      await _channel.invokeMethod<String>(
+        'getLastPpiOfflineRecordingData',
+        [identifier],
+      );
 }
