@@ -403,7 +403,7 @@ class PolarPlugin : FlutterPlugin, MethodCallHandler, PolarBleApiCallbackProvide
                                 else -> throw IllegalArgumentException("Recording type is not yet implemented")
                             }
                             val map = mapOf(
-                                "type" to "aac",
+                                "type" to "ppi",
                                 "data" to it,
                             )
                             val json = gson.toJson(map)
